@@ -7,3 +7,11 @@ Before executing any command:
 - Then proceed with the action
 
 Always prefer clear reasoning before action.
+
+
+
+------
+
+curl -fsSL https://claude.ai/install.sh | bash
+
+claude --version
