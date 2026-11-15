@@ -1,0 +1,52 @@
+# Dependencies
+**/node_modules/
+
+# Local environment files; keep example templates shareable
+**/.env
+**/.env.*
+!**/.env.example
+!**/.env.*.example
+
+# Build and test output
+**/build/
+**/dist/
+**/dist-ssr/
+**/coverage/
+**/test-results/
+
+# Logs and temporary files
+**/*.log
+**/logs/
+**/*.tmp
+**/*.temp
+**/*.pid
+**/*.pid.lock
+**/*.seed
+
+# Terraform local data and generated plans
+**/.terraform/
+**/terraform.tfstate
+**/terraform.tfstate.*
+**/terraform.tfplan
+**/crash.log
+**/crash.*.log
+**/*.auto.tfvars
+# Keep the demo Terraform configuration shareable; do not put credentials here.
+
+# Helm packages downloaded locally
+**/charts/*.tgz
+
+# Local database/runtime data
+**/*.db
+**/*.sqlite
+**/*.sqlite3
+
+# Editor and operating-system files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+._*
+Thumbs.db
