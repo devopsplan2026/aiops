@@ -38,20 +38,21 @@ jobs:
           aws ecr get-login-password --region $AWS_REGION | \
           docker login --username AWS \
           --password-stdin ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com
-
+     
       - name: Build Docker Image
         run: |
           if [ "${{ matrix.service }}" == "frontend" ]; then
-            BUILD_PATH="projects/boutique-microservices/frontend"
+            BUILD_PATH="boutique-microservices/frontend"
           else
-            BUILD_PATH="projects/boutique-microservices/backend/services/${{ matrix.service }}"
+            BUILD_PATH="boutique-microservices/backend/services/${{ matrix.service }}"
           fi
 
           echo "Building from $BUILD_PATH"
 
           docker build \
             -t ${{ secrets.AWS_ACCOUNT_ID }}.dkr.ecr.$AWS_REGION.amazonaws.com/${{ matrix.service }}:$IMAGE_TAG \
-            $BUILD_PATH
+          $BUILD_PATH
+
 
       - name: Push Docker Image
         run: |
@@ -73,4 +74,21 @@ jobs:
 
       - name: Update image tags in k8s manifests
         run: |
-          NEW_TAG=${{
+          NEW_TAG=${{ github.sha }}
+          ACCOUNT=${{ secrets.AWS_ACCOUNT_ID }}
+          REGION=${{ secrets.AWS_REGION }}
+
+          for SERVICE in auth gateway orders order-service product-service user-service; do
+            MANIFEST="gitops/k8s/backend/${SERVICE}.yml"
+            sed -i "s|${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com/${SERVICE}:.*|${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com/${SERVICE}:${NEW_TAG}|g" $MANIFEST
+          done
+
+          sed -i "s|${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com/frontend:.*|${ACCOUNT}.dkr.ecr.${REGION}.amazonaws.com/frontend:${NEW_TAG}|g" gitops/k8s/frontend/deployment.yml
+
+      - name: Commit and push updated manifests
+        run: |
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+          git add gitops/k8s/
+          git diff --staged --quiet || git commit -m "ci: update image tags to ${{ github.sha }}"
+          git push
