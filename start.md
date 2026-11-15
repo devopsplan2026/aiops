@@ -24,3 +24,20 @@ Create a infrastructure with the help of terraform.
 Step: 3
 
 aws eks update-kubeconfig --region us-east-1 --name eks-cluster
+
+
+Step: 4
+
+git push 
+
+Step 5
+
+add env variables insdie git-repo
+
+AWS_ACCESS_KEY_ID
+
+AWS_ACCOUNT_ID
+
+AWS_SECRET_ACCESS_KEY
+
+AWS_REGION
