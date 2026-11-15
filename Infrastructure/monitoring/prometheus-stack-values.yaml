@@ -1,0 +1,149 @@
+alertmanager:
+  enabled: true
+  config:
+    global:
+      resolve_timeout: 5m
+      smtp_smarthost: 'smtp.gmail.com:587'
+      smtp_from: 'guru.devops.plan.1999@gmail.com'
+      smtp_auth_username: 'guru.devops.plan.1999@gmail.com'
+      smtp_auth_password: 'jozg wkxt kkpl rlem'
+      smtp_require_tls: true
+
+    route:
+      group_by: ['alertname', 'cluster', 'service']
+      group_wait: 10s
+      group_interval: 10s
+      repeat_interval: 12h
+      receiver: 'gmail-notifications'
+      routes:
+      - match:
+          severity: critical
+        receiver: gmail-notifications
+        continue: true
+      - match:
+          severity: warning
+        receiver: gmail-notifications
+        continue: true
+
+    receivers:
+    - name: 'gmail-notifications'
+      email_configs:
+      - to: 'guru.devops.plan.1999@gmail.com'
+        from: 'guru.devops.plan.1999@gmail.com'
+        smarthost: 'smtp.gmail.com:587'
+        auth_username: 'guru.devops.plan.1999@gmail.com'
+        auth_password: 'jozg wkxt kkpl rlem'
+        require_tls: true
+        headers:
+          Subject: '🚨 K8s Alert: {{ .GroupLabels.alertname }}'
+        html: |
+          <h2>Alert Details</h2>
+          <b>Alert:</b> {{ .GroupLabels.alertname }}<br>
+          <b>Severity:</b> {{ .CommonLabels.severity }}<br>
+          <b>Namespace:</b> {{ .CommonLabels.namespace }}<br>
+          <b>Pod:</b> {{ .CommonLabels.pod }}<br>
+          <b>Description:</b> {{ range .Alerts }}{{ .Annotations.description }}{{ end }}<br>
+          <b>Time:</b> {{ .CommonAnnotations.timestamp }}<br>
+
+grafana:
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+  service:
+    type: ClusterIP
+
+prometheus:
+  prometheusSpec:
+    resources:
+      limits:
+        memory: 1Gi
+      requests:
+        cpu: 200m
+        memory: 512Mi
+    retention: 2d
+  service:
+    type: ClusterIP
+
+additionalPrometheusRulesMap:
+  boutique-alerts:
+    groups:
+    - name: boutique_application_alerts
+      interval: 30s
+      rules:
+      # Alert when any pod is not running
+      - alert: PodNotRunning
+        expr: kube_pod_status_phase{namespace="boutique", phase!="Running"} == 1
+        for: 2m
+        labels:
+          severity: critical
+          namespace: boutique
+        annotations:
+          summary: "Pod {{ $labels.pod }} is not running"
+          description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has been in {{ $labels.phase }} state for more than 2 minutes."
+
+      # Alert when pod keeps restarting
+      - alert: PodCrashLooping
+        expr: rate(kube_pod_container_status_restarts_total{namespace="boutique"}[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          namespace: boutique
+        annotations:
+          summary: "Pod {{ $labels.pod }} is crash looping"
+          description: "Pod {{ $labels.pod }} in namespace {{ $labels.namespace }} has restarted {{ $value }} times in the last 5 minutes."
+
+      # Alert for high memory usage
+      - alert: HighMemoryUsage
+        expr: (container_memory_usage_bytes{namespace="boutique"} / container_spec_memory_limit_bytes{namespace="boutique"}) * 100 > 80
+        for: 2m
+        labels:
+          severity: warning
+          namespace: boutique
+        annotations:
+          summary: "High memory usage in pod {{ $labels.pod }}"
+          description: "Pod {{ $labels.pod }} is using {{ $value }}% of its memory limit."
+
+      # Alert for high CPU usage
+      - alert: HighCPUUsage
+        expr: (rate(container_cpu_usage_seconds_total{namespace="boutique"}[5m]) * 100) > 80
+        for: 2m
+        labels:
+          severity: warning
+          namespace: boutique
+        annotations:
+          summary: "High CPU usage in pod {{ $labels.pod }}"
+          description: "Pod {{ $labels.pod }} is using high CPU ({{ $value }}%)."
+
+      # Alert when deployment has less replicas than desired
+      - alert: DeploymentReplicasMismatch
+        expr: kube_deployment_spec_replicas{namespace="boutique"} != kube_deployment_status_replicas_available{namespace="boutique"}
+        for: 5m
+        labels:
+          severity: warning
+          namespace: boutique
+        annotations:
+          summary: "Deployment {{ $labels.deployment }} has mismatched replicas"
+          description: "Deployment {{ $labels.deployment }} has {{ $value }} available replicas but {{ $labels.spec_replicas }} desired."
+
+      # Alert when service has no endpoints
+      - alert: ServiceHasNoEndpoints
+        expr: kube_service_spec_type{namespace="boutique"} * on(service, namespace) group_left() (kube_endpoint_address_available{namespace="boutique"} == 0)
+        for: 2m
+        labels:
+          severity: critical
+          namespace: boutique
+        annotations:
+          summary: "Service {{ $labels.service }} has no endpoints"
+          description: "Service {{ $labels.service }} in namespace {{ $labels.namespace }} has no available endpoints."
+
+      # Alert for PostgreSQL down
+      - alert: PostgreSQLDown
+        expr: up{job="kubernetes-pods", namespace="boutique", pod=~"boutique-postgres.*"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          namespace: boutique
+        annotations:
+          summary: "PostgreSQL database is down"
+          description: "PostgreSQL pod in boutique namespace is not responding."
